@@ -4,7 +4,8 @@ import java.util.ArrayList;
 
 public class MBR {
     Double[][] Edges;
-    double area;
+    private double area;
+    private double[] center;
 
     public MBR() {
         Edges = new Double[Main.DIMENSIONS][2];
@@ -32,5 +33,15 @@ public class MBR {
             total *= PO;
         }
         return total;
+    }
+
+    //Calculates & returns the center of this MBR.
+
+    public double[] getCenter() {
+        center = new double[this.Edges.length];
+        for (int i=0; i<this.Edges.length; i++) {
+            center[i] = this.Edges[i][0] + (this.Edges[i][1] - this.Edges[i][0])/2;
+        }
+        return center;
     }
 }

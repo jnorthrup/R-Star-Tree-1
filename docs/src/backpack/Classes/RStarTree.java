@@ -8,6 +8,7 @@ public class RStarTree {
     private static int M = 50;
     private static int m = 20;
     private int depth;
+    private ArrayList<Boolean> Overflown;
 
     public RStarTree() {
         root = new Root();
@@ -83,22 +84,77 @@ public class RStarTree {
         return N;
     }
 
-    public void overflowTreatment() {
-
-    }
-
-    public void reinsert() {
-
-    }
-
-    public void insert(Leaf E) {
-        Node destination = chooseSubTree(E,root);
-        if (destination.Children.size() < M) {
-            E.parent = destination;
-            destination.Children.add(E);
+    public void overflowTreatment(Node N) {
+        if (N.level != 0 && !Overflown.get(N.level)) {
+            reinsert(N);
         }
         else {
-            overflowTreatment();
+            split();
+        }
+    }
+
+    public void reinsert(Node N) {
+        double[] RectDistance = new double[N.Children.size()];
+        double[] globalCenter = N.rectangle.getCenter();
+
+        for (int i=0; i<N.Children.size(); i++) {
+            RectDistance[i] = euclidean(N.Children.get(i).rectangle.getCenter(),globalCenter);
+        }
+
+        double tempDist;
+        Node tempChild;
+        for (int i=0; i<N.Children.size(); i++) {
+            for(int j=1; j < (N.Children.size()-i); j++) {
+                if (RectDistance[j-1] < RectDistance[j]) {
+                    tempDist = RectDistance[j-1];
+                    RectDistance[j-1] = RectDistance[j];
+                    RectDistance[j] = tempDist;
+
+                    tempChild = N.Children.get(j-1);
+                    N.Children.set(j-1,N.Children.get(j));
+                    N.Children.set(j,tempChild);
+                }
+            }
+        }
+
+        ArrayList<Node> Removed = new ArrayList<>();
+        int ceiling = M * 30/100;
+
+        for (int i=0; i<ceiling; i++) {
+            Removed.set(i,N.Children.remove(i));
+        }
+
+        N.formMBR();
+
+        for (int i=0; i<Removed.size(); i++) {
+            insert(Removed.get(i));
+        }
+    }
+
+
+
+    public double euclidean(double[] center,double[] globalCenter) {
+        double distanceSquared = 0;
+        for (int i=0; i<center.length; i++) {
+            distanceSquared += Math.pow(center[i] - globalCenter[i],2);
+        }
+        return Math.sqrt(distanceSquared);
+    }
+
+    public void split() {
+
+    }
+
+    public void insert(Node E) {
+        Node N = chooseSubTree(E,root);
+        E.parent = N;
+        N.Children.add(E);
+
+        if (N.Children.size() >= M) {
+            for (int i=0; i<depth; i++) {
+                Overflown.set(i,false);
+            }
+            overflowTreatment(N);
         }
     }
 
