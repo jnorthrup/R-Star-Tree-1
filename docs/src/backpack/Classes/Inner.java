@@ -33,6 +33,7 @@ public class Inner extends Node {
         Inner copy = new Inner();
         copy.rectangle = this.rectangle;
         copy.id = this.id;
+        copy.Children = new ArrayList<>(this.Children);
         return copy;
     }
 }
