@@ -35,6 +35,14 @@ public class MBR {
         return total;
     }
 
+    public double calculateMargin() {
+        double margin = 0;
+        for (int i=0; i<Edges.length; i++) {
+            margin += Edges[i][1] - Edges[i][0];
+        }
+        return margin;
+    }
+
     //Calculates & returns the center of this MBR.
 
     public double[] getCenter() {

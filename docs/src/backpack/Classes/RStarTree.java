@@ -1,6 +1,7 @@
 package backpack.Classes;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 public class RStarTree {
     private ArrayList<Node> Nodes;
@@ -141,7 +142,81 @@ public class RStarTree {
         return Math.sqrt(distanceSquared);
     }
 
-    public void split() {
+    public void split(Node N) {
+
+    }
+
+    public int chooseSplitAxis(Node N,ArrayList<Node[][]> globalLDistros,ArrayList<Node[][]> globalUDistros) {
+        double minMargin = Double.MAX_VALUE;
+        int splitAxis;
+
+        for (int i=0; i<Main.DIMENSIONS; i++) {
+            double S = 0;
+
+            Node[] Lower = (Node[]) sortChildren(N.Children,i,0).toArray();
+            Node[] Upper = (Node[]) sortChildren(N.Children,i,1).toArray();
+            Node[][] Lgroups = new Node[2][];
+            Node[][] Ugroups = new Node[2][];
+            ArrayList<Node[][]> LDistros = new ArrayList<>();
+            ArrayList<Node[][]> UDistros = new ArrayList<>();
+
+            for (int k=1; k<=M-2*m+2; k++) {
+                for (int l = 0; l < m-1+k; l++) {
+                    Lgroups[0][l] = Lower[l];
+                    Ugroups[0][l] = Upper[l];
+                }
+                for (int l = m-1+k; l<N.Children.size(); l++) {
+                    Lgroups[1][l] = Lower[l];
+                    Ugroups[1][l] = Upper[l];
+                }
+
+                LDistros.add(Lgroups);
+                UDistros.add(Ugroups);
+
+                double currLDistroMargin = distroMargin(Lgroups[0],Lgroups[1]);
+                double currUDistroMargin = distroMargin(Ugroups[0],Ugroups[1]);
+
+                S += currLDistroMargin + currUDistroMargin;
+            }
+
+            if (S < minMargin) {
+                minMargin = S;
+                splitAxis = i;
+                globalLDistros = LDistros;
+                globalUDistros = UDistros;
+            }
+        }
+    }
+
+    public double distroMargin(Node[] firstGroup,Node[] secondGroup) {
+        Inner firstGroupParent = new Inner();
+        Inner secondGroupParent = new Inner();
+
+        firstGroupParent.Children.addAll(Arrays.asList(firstGroup));
+        secondGroupParent.Children.addAll(Arrays.asList(secondGroup));
+
+        firstGroupParent.formMBR();
+        secondGroupParent.formMBR();
+
+        return firstGroupParent.rectangle.calculateMargin() + secondGroupParent.rectangle.calculateMargin();
+    }
+
+    //Sorts Nodes in ascending order, for the given axis, depending on the current factor (factor = 0 --> Lower / factor = 1 --> Upper).
+
+    public ArrayList<Node> sortChildren(ArrayList<Node> Nodes,int axis,int factor) {
+        Node tempNode;
+        for (int i=0; i<Nodes.size(); i++) {
+            for(int j=1; j < (Nodes.size()-i); j++) {
+                if (Nodes.get(j-1).rectangle.Edges[axis][factor] < Nodes.get(j).rectangle.Edges[axis][factor]) {
+                    tempNode = Nodes.get(j-1);
+                    Nodes.set(j-1,Nodes.get(j));
+                    Nodes.set(j,tempNode);
+                }
+            }
+        }
+    }
+
+    public int chooseSplitIndex() {
 
     }
 
