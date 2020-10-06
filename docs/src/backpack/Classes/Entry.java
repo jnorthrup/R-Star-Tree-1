@@ -27,8 +27,7 @@ public class Entry {
 
     public Entry(String line) {
         Coordinates = new Double[Main.DIMENSIONS];
-        String clean = line.replaceAll("\\s+", "");
-        Scanner scan = new Scanner(clean);
+        Scanner scan = new Scanner(line);
 
         if (!line.isEmpty()) {
             id = scan.nextLong();

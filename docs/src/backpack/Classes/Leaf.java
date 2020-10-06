@@ -3,13 +3,19 @@ package backpack.Classes;
 import java.util.ArrayList;
 
 public class Leaf extends Node {
-
-    public static int level = 1;
+    private static int blockNO = 1;
+    private int blockID;
     private ArrayList<Entry> Entries;
+
+    public ArrayList<Entry> getEntries() {
+        return Entries;
+    }
 
     public Leaf() {
         Entries = new ArrayList<>();
         Children = null;
+        blockID = blockNO++;
+        rectangle = new MBR();
     }
 
     @Override
@@ -34,7 +40,6 @@ public class Leaf extends Node {
     public Node clone() {
         Leaf copy = new Leaf();
         copy.rectangle = this.rectangle;
-        copy.id = this.id;
         return copy;
     }
 }

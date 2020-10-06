@@ -1,22 +1,47 @@
 package backpack.Classes;
 
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Scanner;
 
-public class RStarTree {
+public class RStarTree implements Serializable {
     private ArrayList<Node> Nodes;
-    private Root root;
-    private static int M = 50;
-    private static int m = 20;
+    private Node root;
+    private static int M = 5;
+    private static int m = 2;
     private int depth;
     private ArrayList<Boolean> Overflown;
 
     public RStarTree() {
+        Nodes = new ArrayList<>();
         root = new Root();
-        depth = 0;
+        Nodes.add(root);
+        depth = 1;
     }
 
-    public Node chooseSubTree(Leaf E,Node N) {
+    public void show() {
+        int leafNO = 0;
+        int innerNO = 0;
+        int node = 0;
+
+        for (int i=0; i<Nodes.size(); i++) {
+            if (Nodes.get(i) instanceof Leaf) {
+                leafNO++;
+            }
+            else if (Nodes.get(i) instanceof Inner) {
+                innerNO++;
+            }
+            else {
+                node++;
+            }
+        }
+        System.out.println("CURRENT STATE OF R* TREE");
+        System.out.println("Total Nodes: " + Nodes.size());
+        System.out.println("Leaves: " + leafNO + "\nInner Nodes: " + innerNO + "\nOther: " +node);
+    }
+
+    public Node chooseSubTree(Node E,Node N) {
         if (N instanceof Root && (N.Children.isEmpty() || N.Children.get(0) instanceof Leaf)) {
             return N;
         }
@@ -86,11 +111,19 @@ public class RStarTree {
     }
 
     public void overflowTreatment(Node N) {
+        Node parent = N.parent;
         if (N.level != 0 && !Overflown.get(N.level)) {
             reinsert(N);
         }
         else {
-            split();
+            split(N);
+        }
+        Overflown.set(N.level,true);
+
+        if (parent != null) {
+            if (parent.Children.size() > M) {
+                overflowTreatment(N.parent);
+            }
         }
     }
 
@@ -143,35 +176,82 @@ public class RStarTree {
     }
 
     public void split(Node N) {
+        Node[][] OptimalDistro = chooseSplitAxis(N);
+        Node leftSub = new Inner();
+        Node rightSub = new Inner();
+        leftSub.level = 1;
+        rightSub.level = 1;
 
+        if (N instanceof Root) {
+            Node newRoot = new Root();
+            root = newRoot;
+            Nodes.add(newRoot);
+            depth++;
+            leftSub.parent = newRoot;
+            rightSub.parent = newRoot;
+
+            for (int i=0; i<Nodes.size(); i++) {
+                if (!(Nodes.get(i) instanceof Root)) {
+                    Nodes.get(i).level++;
+                }
+            }
+        }
+        else {
+            leftSub.parent = N.parent;
+            rightSub.parent = N.parent;
+        }
+
+        for (int i=0; i<OptimalDistro[0].length; i++) {
+            OptimalDistro[0][i].parent = leftSub;
+            leftSub.Children.add(OptimalDistro[0][i]);
+        }
+
+        for (int i=0; i<OptimalDistro[1].length; i++) {
+            OptimalDistro[1][i].parent = rightSub;
+            rightSub.Children.add(OptimalDistro[1][i]);
+        }
+
+        Nodes.remove(N);
+        Nodes.add(leftSub);
+        Nodes.add(rightSub);
     }
 
-    public int chooseSplitAxis(Node N,ArrayList<Node[][]> globalLDistros,ArrayList<Node[][]> globalUDistros) {
+    public Node[][] chooseSplitAxis(Node N) {
+        ArrayList<Node[][]> GlobalLDistros = new ArrayList<>();
+        ArrayList<Node[][]> GlobalUDistros = new ArrayList<>();
         double minMargin = Double.MAX_VALUE;
-        int splitAxis;
 
         for (int i=0; i<Main.DIMENSIONS; i++) {
             double S = 0;
 
-            Node[] Lower = (Node[]) sortChildren(N.Children,i,0).toArray();
-            Node[] Upper = (Node[]) sortChildren(N.Children,i,1).toArray();
+            Node[] Lower = sortChildren(N.Children,i,0);
+            Node[] Upper = sortChildren(N.Children,i,1);
             Node[][] Lgroups = new Node[2][];
             Node[][] Ugroups = new Node[2][];
-            ArrayList<Node[][]> LDistros = new ArrayList<>();
-            ArrayList<Node[][]> UDistros = new ArrayList<>();
+            ArrayList<Node[][]> LowerDistros = new ArrayList<>();
+            ArrayList<Node[][]> UpperDistros = new ArrayList<>();
 
             for (int k=1; k<=M-2*m+2; k++) {
+                Lgroups[0] = new Node[m-1+k];
+                Ugroups[0] = new Node[m-1+k];
+                Lgroups[1] = new Node[N.Children.size() - (m-1+k)];
+                Ugroups[1] = new Node[N.Children.size() - (m-1+k)];
+
                 for (int l = 0; l < m-1+k; l++) {
                     Lgroups[0][l] = Lower[l];
                     Ugroups[0][l] = Upper[l];
                 }
+
+                int j = 0;
+
                 for (int l = m-1+k; l<N.Children.size(); l++) {
-                    Lgroups[1][l] = Lower[l];
-                    Ugroups[1][l] = Upper[l];
+                    Lgroups[1][j] = Lower[l];
+                    Ugroups[1][j] = Upper[l];
+                    j++;
                 }
 
-                LDistros.add(Lgroups);
-                UDistros.add(Ugroups);
+                LowerDistros.add(Lgroups);
+                UpperDistros.add(Ugroups);
 
                 double currLDistroMargin = distroMargin(Lgroups[0],Lgroups[1]);
                 double currUDistroMargin = distroMargin(Ugroups[0],Ugroups[1]);
@@ -181,11 +261,95 @@ public class RStarTree {
 
             if (S < minMargin) {
                 minMargin = S;
-                splitAxis = i;
-                globalLDistros = LDistros;
-                globalUDistros = UDistros;
+                GlobalLDistros = LowerDistros;
+                GlobalUDistros = UpperDistros;
             }
         }
+        return chooseSplitIndex(GlobalLDistros,GlobalUDistros);
+    }
+
+    public Node[][] chooseSplitIndex(ArrayList<Node[][]> LowerDistros,ArrayList<Node[][]> UpperDistros) {
+        ArrayList<Node[][]> Finalists = new ArrayList<>();
+        double lowerMinOverlap = minOverlapValue(LowerDistros);
+        double upperMinOverlap = minOverlapValue(UpperDistros);
+        double globalMinOverlap;
+
+        if (lowerMinOverlap < upperMinOverlap) {
+            globalMinOverlap = lowerMinOverlap;
+        }
+        else {
+            globalMinOverlap = upperMinOverlap;
+        }
+
+        for (int i=0; i<LowerDistros.size(); i++) {
+            if (distroOverlap(LowerDistros.get(i)[0],LowerDistros.get(i)[1]) == globalMinOverlap) {
+                Finalists.add(LowerDistros.get(i));
+            }
+            if (distroOverlap(UpperDistros.get(i)[0],UpperDistros.get(i)[1]) < globalMinOverlap) {
+                Finalists.add(UpperDistros.get(i));
+            }
+        }
+
+        if (Finalists.size() == 1) {
+            return Finalists.get(0);
+        }
+        else {
+            return minAreaValue(Finalists);
+        }
+
+    }
+
+    public Node[][] minAreaValue(ArrayList<Node[][]> Distros) {
+        double minArea = Double.MAX_VALUE;
+        Node[][] optimalDistro = new Node[2][];
+
+        for (int i=0; i<Distros.size(); i++) {
+            if (distroArea(Distros.get(i)[0],Distros.get(i)[1]) < minArea) {
+                minArea = distroArea(Distros.get(i)[0],Distros.get(i)[1]);
+                optimalDistro = Distros.get(i);
+            }
+        }
+        return optimalDistro;
+    }
+
+    public double distroArea(Node[] firstGroup,Node[] secondGroup) {
+        Inner firstGroupParent = new Inner();
+        Inner secondGroupParent = new Inner();
+
+        firstGroupParent.Children.addAll(Arrays.asList(firstGroup));
+        secondGroupParent.Children.addAll(Arrays.asList(secondGroup));
+
+        firstGroupParent.formMBR();
+        secondGroupParent.formMBR();
+
+        return firstGroupParent.rectangle.calculateArea() + secondGroupParent.rectangle.calculateArea();
+    }
+
+    public double minOverlapValue(ArrayList<Node[][]> Distros) {
+        double minOverlapValue = Double.MAX_VALUE;
+        double[] OverlapValue = new double[Distros.size()];
+
+        for (int i=0; i<Distros.size(); i++) {
+            OverlapValue[i] = distroOverlap(Distros.get(i)[0],Distros.get(i)[1]);
+
+            if (OverlapValue[i] < minOverlapValue) {
+                minOverlapValue = OverlapValue[i];
+            }
+        }
+        return minOverlapValue;
+    }
+
+    public double distroOverlap(Node[] firstGroup,Node[] secondGroup) {
+        Inner firstGroupParent = new Inner();
+        Inner secondGroupParent = new Inner();
+
+        firstGroupParent.Children.addAll(Arrays.asList(firstGroup));
+        secondGroupParent.Children.addAll(Arrays.asList(secondGroup));
+
+        firstGroupParent.formMBR();
+        secondGroupParent.formMBR();
+
+        return firstGroupParent.rectangle.calculateOverlap(secondGroupParent.rectangle);
     }
 
     public double distroMargin(Node[] firstGroup,Node[] secondGroup) {
@@ -203,7 +367,7 @@ public class RStarTree {
 
     //Sorts Nodes in ascending order, for the given axis, depending on the current factor (factor = 0 --> Lower / factor = 1 --> Upper).
 
-    public ArrayList<Node> sortChildren(ArrayList<Node> Nodes,int axis,int factor) {
+    public Node[] sortChildren(ArrayList<Node> Nodes,int axis,int factor) {
         Node tempNode;
         for (int i=0; i<Nodes.size(); i++) {
             for(int j=1; j < (Nodes.size()-i); j++) {
@@ -214,26 +378,35 @@ public class RStarTree {
                 }
             }
         }
-    }
-
-    public int chooseSplitIndex() {
-
+        Node[] Sorted = new Node[Nodes.size()];
+        for (int i=0; i<Nodes.size(); i++) {
+            Sorted[i] = Nodes.get(i);
+        }
+        return Sorted;
     }
 
     public void insert(Node E) {
         Node N = chooseSubTree(E,root);
         E.parent = N;
+        E.level = E.parent.level + 1;
         N.Children.add(E);
+        Nodes.add(E);
 
-        if (N.Children.size() >= M) {
+        if (N.Children.size() > M) {
+            Overflown = new ArrayList<>();
             for (int i=0; i<depth; i++) {
-                Overflown.set(i,false);
+                Overflown.add(false);
             }
             overflowTreatment(N);
         }
+
+        while (!(E instanceof Root)){
+            E.parent.formMBR();
+            E = E.parent;
+        }
     }
 
-    public ArrayList<Integer> minOverlapEnlargement(Leaf E,ArrayList<Node> Nodes) {
+    public ArrayList<Integer> minOverlapEnlargement(Node E,ArrayList<Node> Nodes) {
         Node copy;
         double min = Double.MAX_VALUE;
         double[] OverlapDiff = new double[Nodes.size()];
@@ -269,14 +442,14 @@ public class RStarTree {
     public double totalOverlap(Node N, ArrayList<Node> Nodes) {
         double total = 0;
         for (Node node : Nodes) {
-            if (N.id != node.id) {
+            if (!N.equals(node)) {
                 total += N.rectangle.calculateOverlap(node.rectangle);
             }
         }
         return total;
     }
 
-    public ArrayList<Integer> minAreaEnlargement(Leaf E, ArrayList<Node> Nodes) {
+    public ArrayList<Integer> minAreaEnlargement(Node E, ArrayList<Node> Nodes) {
         Node copy;
         double min = Double.MAX_VALUE;
         double[] AreaDiff = new double[Nodes.size()];
@@ -322,4 +495,50 @@ public class RStarTree {
         return index;
     }
 
+    public void fillLeaf(Leaf E,ArrayList<Entry> Entries) {
+        for (Entry entry : Entries) {
+            E.getEntries().add(entry);
+        }
+        E.formMBR();
+    }
+
+    public void serialize() throws IOException {
+        File out = new File("docs/res/indexfile.bin");
+        FileOutputStream fos = new FileOutputStream(out);
+        ObjectOutputStream oos = new ObjectOutputStream(fos);
+        oos.writeObject(this);
+    }
+
+    public void build() {
+        try {
+            File input = new File("docs/res/datafile.txt");
+            Scanner scan = new Scanner(input);
+
+            ArrayList<Entry> Entries = new ArrayList<>();
+            int size = 0;
+
+            while (scan.hasNextLine()) {
+                String clean = scan.nextLine();
+                Entry point = new Entry(clean);
+                clean = clean.replaceAll("\\s+", "");
+                int sizeOfEntry = clean.getBytes().length;
+
+                if (size + sizeOfEntry <= 32 * 1024) {
+                    Entries.add(point);
+                    size += sizeOfEntry;
+                } else {
+                    Leaf E = new Leaf();
+                    fillLeaf(E, Entries);
+                    insert(E);
+
+                    Entries = new ArrayList<>();
+                    Entries.add(point);
+                    size = sizeOfEntry;
+                }
+            }
+        }
+        catch (FileNotFoundException e) {
+            System.out.println("The input file could not be located. The app was terminated.");
+        }
+    }
 }
