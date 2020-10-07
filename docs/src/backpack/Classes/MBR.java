@@ -2,8 +2,10 @@ package backpack.Classes;
 
 import java.util.ArrayList;
 
+//Class describing rectangle objects, used by all descendants of Node Class.
+
 public class MBR {
-    Double[][] Edges;
+    Double[][] Edges; //The Edges are stored per dimension in a double[2] array, where [0] contains the minX of the current Dimension and [1] the maxX.
     private double area;
     private double[] center;
 
@@ -34,6 +36,8 @@ public class MBR {
         }
         return total;
     }
+
+    //Calculates totalMargin, i.e. the sum of lengths of all Edges of the rectangle.
 
     public double calculateMargin() {
         double margin = 0;

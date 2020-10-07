@@ -5,13 +5,17 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Scanner;
 
+//Class that describes the R* Tree itself. All algorithms and contained Nodes are managed from this class.
+
 public class RStarTree implements Serializable {
-    private ArrayList<Node> Nodes;
-    private Node root;
-    private static int M = 5;
-    private static int m = 2;
-    private int depth;
-    private ArrayList<Boolean> Overflown;
+    private ArrayList<Node> Nodes; //Contains all Nodes inserted in the Tree (Leaves,Inners,Root)
+    private Node root; //Stores the current Root object f the R* Tree (unique).
+    private static int M = 5; //Maximum number of Children before being overflown.
+    private static int m = 2; //Minimum number of Children that can be assigned after split.
+    private int depth; //Distance, in number of nodes, between root and leaves (all leaves maintain the same *static* level).
+    private ArrayList<Boolean> Overflown; //Used to mark in which levels OverflowTreatment has been invoked during the insertion of ONE new leaf (data rectangle). Afterwards it is reset.
+
+    //Creates new Tree, adding its root and setting its initial depth to 1 (although the depth equals 1 only when the first leaf is inserted).
 
     public RStarTree() {
         Nodes = new ArrayList<>();
@@ -20,6 +24,25 @@ public class RStarTree implements Serializable {
         depth = 1;
     }
 
+    //Outputs current Tree state to console. Used for Debugging and overviewing Nodes' relations.
+
+    public void familyTree() {
+        for (int i=0; i<Nodes.size(); i++) {
+            System.out.print("Node: " + Nodes.get(i).getClass() + " Parent: " + Nodes.get(i).parent + " Children: ");
+            if (!(Nodes.get(i) instanceof Leaf)) {
+                for (int j = 0; j < Nodes.get(i).Children.size(); j++) {
+                    System.out.print(Nodes.get(i).Children.get(j) + "  ");
+                }
+            }
+            else {
+                System.out.print("Null");
+            }
+            System.out.println();
+        }
+        System.out.println("\n\n");
+    }
+
+    //Outputs number of total Nodes and number of node per category (Leaf,Inner,Root) of the Tree.
     public void show() {
         int leafNO = 0;
         int innerNO = 0;
@@ -41,7 +64,11 @@ public class RStarTree implements Serializable {
         System.out.println("Leaves: " + leafNO + "\nInner Nodes: " + innerNO + "\nOther: " +node);
     }
 
-    public Node chooseSubTree(Node E,Node N) {
+    //This method gets a Node E as input, which has to be inserted in the best fitting Node, whose level equals the levelOfInsertion.
+    //It works recursively, starting from the Node N given (always the root when initially invoked) and evaluating its children nodes until the appropriate level is reached.
+    //In every recursion, the optimal child is selected and the algorithm repeats itself traversing the optimal subTree, until it returns the appropriate parent Node in which E should be inserted.
+
+    public Node chooseSubTree(Node E,Node N,int levelOfInsertion) {
         if (N instanceof Root && (N.Children.isEmpty() || N.Children.get(0) instanceof Leaf)) {
             return N;
         }
@@ -92,7 +119,12 @@ public class RStarTree implements Serializable {
 
                 ArrayList<Integer> Index = minAreaEnlargement(E,N.Children);
                 if (Index.size() == 1) {
-                    chooseSubTree(E,N.Children.get(Index.get(0)));
+                    if (N.Children.get(0).level == levelOfInsertion - 1) {
+                        return N.Children.get(Index.get(0));
+                    }
+                    else {
+                        chooseSubTree(E, N.Children.get(Index.get(0)),levelOfInsertion);
+                    }
                 }
                 else {
 
@@ -103,12 +135,19 @@ public class RStarTree implements Serializable {
                         TiedChildren.add(N.Children.get(Index.get(i)));
                     }
                     int index = minArea(TiedChildren);
-                    chooseSubTree(E,TiedChildren.get(index));
+                    if (N.Children.get(0).level == levelOfInsertion - 1) {
+                        return N.Children.get(index);
+                    }
+                    else {
+                        chooseSubTree(E,TiedChildren.get(index),levelOfInsertion);
+                    }
                 }
             }
         }
         return N;
     }
+
+    //Method used to adjust and reorganize Node N, by splitting him in two new Inner Nodes or reinserting p (30%) of its Children, after acquiring M+1 of them.
 
     public void overflowTreatment(Node N) {
         Node parent = N.parent;
@@ -126,6 +165,8 @@ public class RStarTree implements Serializable {
             }
         }
     }
+
+    //Method used to reinsert p (30%) Children of Node N, after it being overflown.
 
     public void reinsert(Node N) {
         double[] RectDistance = new double[N.Children.size()];
@@ -155,6 +196,7 @@ public class RStarTree implements Serializable {
         int ceiling = M * 30/100;
 
         for (int i=0; i<ceiling; i++) {
+            Nodes.remove(N.Children.get(i));
             Removed.set(i,N.Children.remove(i));
         }
 
@@ -165,7 +207,7 @@ public class RStarTree implements Serializable {
         }
     }
 
-
+    //Method that calculates the euclidean distance between the center of a child MBR and the center of its parent MBR.
 
     public double euclidean(double[] center,double[] globalCenter) {
         double distanceSquared = 0;
@@ -175,23 +217,27 @@ public class RStarTree implements Serializable {
         return Math.sqrt(distanceSquared);
     }
 
+    //Method used to split Node N, into two new Inner nodes. This method is responsible for adjusting all other affected components of the tree.
+    //Such as adjusting new parent / child relations, creating a new root if a root split was performed and adjusting the levels if the depth of the tree has increased.
     public void split(Node N) {
         Node[][] OptimalDistro = chooseSplitAxis(N);
         Node leftSub = new Inner();
         Node rightSub = new Inner();
-        leftSub.level = 1;
-        rightSub.level = 1;
 
         if (N instanceof Root) {
             Node newRoot = new Root();
             root = newRoot;
             Nodes.add(newRoot);
             depth++;
+            newRoot.Children.add(leftSub);
+            newRoot.Children.add(rightSub);
             leftSub.parent = newRoot;
             rightSub.parent = newRoot;
+            leftSub.level = 1;
+            rightSub.level = 1;
 
             for (int i=0; i<Nodes.size(); i++) {
-                if (!(Nodes.get(i) instanceof Root)) {
+                if (!(Nodes.get(i) instanceof Root) && !(Nodes.get(i).equals(leftSub) || Nodes.get(i).equals(rightSub))) {
                     Nodes.get(i).level++;
                 }
             }
@@ -199,22 +245,31 @@ public class RStarTree implements Serializable {
         else {
             leftSub.parent = N.parent;
             rightSub.parent = N.parent;
+            leftSub.level = N.level;
+            rightSub.level = N.level;
         }
 
         for (int i=0; i<OptimalDistro[0].length; i++) {
             OptimalDistro[0][i].parent = leftSub;
+            OptimalDistro[0][i].level = leftSub.level + 1;
             leftSub.Children.add(OptimalDistro[0][i]);
         }
 
         for (int i=0; i<OptimalDistro[1].length; i++) {
             OptimalDistro[1][i].parent = rightSub;
+            OptimalDistro[1][i].level = rightSub.level + 1;
             rightSub.Children.add(OptimalDistro[1][i]);
         }
 
         Nodes.remove(N);
         Nodes.add(leftSub);
         Nodes.add(rightSub);
+
+        familyTree();
     }
+
+    //Method used to determine the optimal split axis, perpendicular to which a split should be performed.
+    //The axis is selected according to the distributions' margin values.
 
     public Node[][] chooseSplitAxis(Node N) {
         ArrayList<Node[][]> GlobalLDistros = new ArrayList<>();
@@ -268,6 +323,9 @@ public class RStarTree implements Serializable {
         return chooseSplitIndex(GlobalLDistros,GlobalUDistros);
     }
 
+    //Method used for selecting the optimal distribution from the given candidates of the selected axis.
+    //The selection criteria are their overlap and area values.
+
     public Node[][] chooseSplitIndex(ArrayList<Node[][]> LowerDistros,ArrayList<Node[][]> UpperDistros) {
         ArrayList<Node[][]> Finalists = new ArrayList<>();
         double lowerMinOverlap = minOverlapValue(LowerDistros);
@@ -299,6 +357,8 @@ public class RStarTree implements Serializable {
 
     }
 
+    //Method that returns the distribution with the MBR of minimum area from a set of distributions.
+
     public Node[][] minAreaValue(ArrayList<Node[][]> Distros) {
         double minArea = Double.MAX_VALUE;
         Node[][] optimalDistro = new Node[2][];
@@ -312,6 +372,8 @@ public class RStarTree implements Serializable {
         return optimalDistro;
     }
 
+    //Method that calculates the area of a given distribution.
+
     public double distroArea(Node[] firstGroup,Node[] secondGroup) {
         Inner firstGroupParent = new Inner();
         Inner secondGroupParent = new Inner();
@@ -324,6 +386,8 @@ public class RStarTree implements Serializable {
 
         return firstGroupParent.rectangle.calculateArea() + secondGroupParent.rectangle.calculateArea();
     }
+
+    //Method that calculates the minimumOverlapValue of a set of distributions.
 
     public double minOverlapValue(ArrayList<Node[][]> Distros) {
         double minOverlapValue = Double.MAX_VALUE;
@@ -339,6 +403,8 @@ public class RStarTree implements Serializable {
         return minOverlapValue;
     }
 
+    //Method that calculates the overlap of a given distribution. That is, the overlap of its 1st and 2nd group of entries.
+
     public double distroOverlap(Node[] firstGroup,Node[] secondGroup) {
         Inner firstGroupParent = new Inner();
         Inner secondGroupParent = new Inner();
@@ -351,6 +417,8 @@ public class RStarTree implements Serializable {
 
         return firstGroupParent.rectangle.calculateOverlap(secondGroupParent.rectangle);
     }
+
+    //Method that calculates the margin of a given distribution. That is, the sum of the margin of its groups.
 
     public double distroMargin(Node[] firstGroup,Node[] secondGroup) {
         Inner firstGroupParent = new Inner();
@@ -385,8 +453,17 @@ public class RStarTree implements Serializable {
         return Sorted;
     }
 
+    //Method used to insert new Nodes in the Tree. Also invokes OverflowTreatment when necessary and reforms the Nodes' MBRs if they were along the insertion path of Node E.
+
     public void insert(Node E) {
-        Node N = chooseSubTree(E,root);
+        int levelOfInsertion;
+        if (E instanceof Leaf) {
+            levelOfInsertion = depth;
+        }
+        else {
+            levelOfInsertion = E.level;
+        }
+        Node N = chooseSubTree(E,root,levelOfInsertion);
         E.parent = N;
         E.level = E.parent.level + 1;
         N.Children.add(E);
@@ -394,7 +471,7 @@ public class RStarTree implements Serializable {
 
         if (N.Children.size() > M) {
             Overflown = new ArrayList<>();
-            for (int i=0; i<depth; i++) {
+            for (int i=0; i<=depth; i++) {
                 Overflown.add(false);
             }
             overflowTreatment(N);
@@ -404,7 +481,10 @@ public class RStarTree implements Serializable {
             E.parent.formMBR();
             E = E.parent;
         }
+        familyTree();
     }
+
+    //Method that returns the the indices of the Nodes with minimum Overlap Enlargement after the insertion of Node E.
 
     public ArrayList<Integer> minOverlapEnlargement(Node E,ArrayList<Node> Nodes) {
         Node copy;
@@ -439,6 +519,8 @@ public class RStarTree implements Serializable {
         return Index;
     }
 
+    //Method that calculates total overlap of Node N with all other Nodes.
+
     public double totalOverlap(Node N, ArrayList<Node> Nodes) {
         double total = 0;
         for (Node node : Nodes) {
@@ -448,6 +530,8 @@ public class RStarTree implements Serializable {
         }
         return total;
     }
+
+    //Method that returns the indices of the Nodes with minimum area enlargement afetr the inserton of Node E.
 
     public ArrayList<Integer> minAreaEnlargement(Node E, ArrayList<Node> Nodes) {
         Node copy;
@@ -482,6 +566,8 @@ public class RStarTree implements Serializable {
         return Index;
     }
 
+    //Method that returns the index of the Node with min Area.
+
     public int minArea(ArrayList<Node> Nodes) {
         double min = Nodes.get(0).rectangle.calculateArea();
         int index = 0;
@@ -495,6 +581,8 @@ public class RStarTree implements Serializable {
         return index;
     }
 
+    //Method that fills Leaf E with the Entries given and forms its MBR.
+
     public void fillLeaf(Leaf E,ArrayList<Entry> Entries) {
         for (Entry entry : Entries) {
             E.getEntries().add(entry);
@@ -502,12 +590,16 @@ public class RStarTree implements Serializable {
         E.formMBR();
     }
 
+    //Method that stores the state of the tree in the binary file indexfile.bin.
+
     public void serialize() throws IOException {
         File out = new File("docs/res/indexfile.bin");
         FileOutputStream fos = new FileOutputStream(out);
         ObjectOutputStream oos = new ObjectOutputStream(fos);
         oos.writeObject(this);
     }
+
+    //Method that reads the data from the datafile, forms entries, fills leaves and inserts them to begin the formation of the final R* Tree.
 
     public void build() {
         try {

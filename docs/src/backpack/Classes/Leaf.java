@@ -2,6 +2,8 @@ package backpack.Classes;
 
 import java.util.ArrayList;
 
+//Class that describes the Leaf Node objects. They contain Entries as their "children". They comprise the main building blocks of the R* Tree, containing all the database's information.
+
 public class Leaf extends Node {
     private static int blockNO = 1;
     private int blockID;
@@ -17,6 +19,8 @@ public class Leaf extends Node {
         blockID = blockNO++;
         rectangle = new MBR();
     }
+
+    //Overridden method formMBR() builds the Leaf's MBR by searching through its data entries (spatial points).
 
     @Override
     protected void formMBR() {

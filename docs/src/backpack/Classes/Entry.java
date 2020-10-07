@@ -3,9 +3,11 @@ package backpack.Classes;
 import java.util.ArrayList;
 import java.util.Scanner;
 
+//Class that describes a point. Basically the content of the leaves of the tree, the contents of data rectangles (leaves).
+
 public class Entry {
-    private long id;
-    private Double[] Coordinates;
+    private long id; //id of point in spatial data.
+    private Double[] Coordinates; //Rest of features of current point. E.g. lat / lon.
 
     public long getId() {
         return id;

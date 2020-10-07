@@ -5,15 +5,21 @@ import java.io.FileNotFoundException;
 import java.io.PrintWriter;
 import java.util.Scanner;
 
+//This class' objects are functioning by filtering the osm input file, and creating the final state of the datafile used to later construct the R* Tree.
+//This application has been programmed to accept .osm input files of 2 dimensional spatial data (id / lat / lon). However, the rest of the algorithms are designed for n-dimensions.
+
 public class OSMParser {
     File OSM;
     File datafile;
+
+    //Stores .osm input file.
 
     public OSMParser(File OSM) {
         this.OSM = OSM;
         datafile = new File("docs/res/datafile.txt");
     }
 
+    //Filters .osm input file and outputs the datafile.txt which stores the data of one Entry (point in space) per line.
     public void parse() {
         try {
             Scanner scan = new Scanner(OSM);
@@ -41,6 +47,9 @@ public class OSMParser {
             System.exit(0);
         }
     }
+
+    //Gets a String input and cleans it. Used to isolate information from feature declarations of the input .osm file.
+    //E.g. input: id="12392494" output: "12392494"
 
     public static String clean(String input) {
         StringBuilder sanitized = new StringBuilder();
