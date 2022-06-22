@@ -1,2 +1,2 @@
-docs/* linguist-documentation=false
-docs/* linguist-vendored=false
+docs/src/backpack/Classes/* linguist-documentation=false
+docs/src/backpack/Classes/* linguist-vendored=false
